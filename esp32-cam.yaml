@@ -1,0 +1,162 @@
+esphome:
+  name: esp32-cam-node
+  friendly_name: 摄像头
+  min_version: 2024.11.0
+
+esp32:
+  board: esp32cam
+  framework:
+    type: arduino
+
+# PSRAM (摄像头必需)
+psram:
+
+# 日志
+logger:
+  level: DEBUG
+
+# WiFi
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # 静态 IP (可选)
+  # manual_ip:
+  #   static_ip: 192.168.2.XXX
+  #   gateway: 192.168.2.1
+  #   subnet: 255.255.255.0
+  
+  # AP 热点备份
+  ap:
+    ssid: "ESP32-CAM Hotspot"
+    password: !secret ap_password
+
+# Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+# OTA 更新
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# 网络时间
+time:
+  - platform: sntp
+    timezone: "Asia/Shanghai"
+    servers:
+      - ntp.aliyun.com
+      - ntp.tencent.com
+
+# I2C 总线 (摄像头)
+i2c:
+  - id: camera_i2c
+    sda: GPIO26
+    scl: GPIO27
+    frequency: 400kHz
+
+# 摄像头配置
+esp32_camera:
+  name: "ESP32 Camera"
+  id: cam
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_id: camera_i2c
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  
+  # 图像设置
+  resolution: 1024x768  # XGA
+  jpeg_quality: 10
+  vertical_flip: false
+  horizontal_mirror: false
+  
+  # 帧率控制
+  max_framerate: 15 fps
+  
+  # 夜视模式 (可选)
+  # night_mode:
+  #   enabled: true
+  #   brightness: 2
+
+# 闪光灯
+output:
+  - platform: gpio
+    pin: GPIO4
+    id: esp32_cam_flash
+
+# 闪光灯开关
+light:
+  - platform: binary
+    name: "摄像头闪光灯"
+    output: esp32_cam_flash
+    id: cam_flashlight
+    restore_mode: RESTORE_DEFAULT_OFF
+
+# 状态 LED (板载)
+output:
+  - platform: gpio
+    pin: GPIO33
+    id: status_led
+
+light:
+  - platform: binary
+    name: "状态指示灯"
+    output: status_led
+    id: status_light
+    restore_mode: RESTORE_DEFAULT_ON
+    internal: true
+
+# 重启按钮
+button:
+  - platform: restart
+    name: "摄像头重启"
+    id: restart_button
+
+# 传感器
+sensor:
+  # WiFi 信号
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+  
+  # Uptime
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+# 文本传感器
+text_sensor:
+  # WiFi 信息
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "WiFi SSID"
+    bssid:
+      name: "WiFi BSSID"
+
+# Web 服务器 (可选)
+web_server:
+  port: 80
+  version: 2
+
+# 开关 (用于自动化)
+switch:
+  # 摄像头电源
+  - platform: template
+    name: "摄像头开关"
+    id: camera_power
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: |-
+          id(cam).start();
+    turn_off_action:
+      - lambda: |-
+          id(cam).stop();
